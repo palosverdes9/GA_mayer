@@ -131,3 +131,33 @@ jobs:
         run: |
           IMAGE_TAG="${{ needs.build.outputs.image-tags }}"
           docker image push ${{ secrets.DOCKERHUB_USERNAME }}/thinknyx_app:$IMAGE_TAG
+
+  publish-ghcr:
+    name: Publish to GitHub Container Registry
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      packages: write
+      contents: read
+    steps:
+      - name: Download the Image
+        uses: actions/download-artifact@v5.0.0
+        with:
+          name: thinknyx_app_image
+          path: .
+      - name: Load Docker Image
+        run: docker load -i thinknyx_app.tar
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }} # GitHub automatically creates a GITHUB_TOKEN secret to use in your workflow, push to GHCR, Create releaase, add comments, create issues
+      - name: Tag Image
+        run: |
+          IMAGE_TAG="${{ needs.build.outputs.image-tags }}"
+          docker image tag thinknyx_app:$IMAGE_TAG ghcr.io/${{ github.repository_owner }}/thinknyx_app:$IMAGE_TAG
+      - name: Push Image
+        run: |
+          IMAGE_TAG="${{ needs.build.outputs.image-tags }}"
+          docker image push ghcr.io/${{ github.repository_owner }}/thinknyx_app:$IMAGE_TAG
