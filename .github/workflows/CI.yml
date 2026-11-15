@@ -6,7 +6,51 @@ on:
       - main
 
 jobs:
-  unit-tests:
+  codeql: #CI 2.SAST
+    name: CodeQL Security Scan
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write # Required to upload the analysis results
+    strategy:
+      matrix: 
+        language: [ 'python']
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v5.0.0
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "security"
+          
+  sonarqube: #CI 3.code quality
+    name: SonarQube
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    steps:
+      - uses: actions/checkout@v5.0.0
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+      - name: Download Coverage Report
+        uses: actions/download-artifact@v5.0.0
+        with:
+          name: unit-test-report
+          path: reports/
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      - name: SonarQube Quality Gate Check
+        uses: SonarSource/sonarqube-quality-gate-action@v1.1.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          
+  unit-tests: #CI 6 testing
     name: Running Unit Tests
     runs-on: ubuntu-latest
     steps:
@@ -29,50 +73,6 @@ jobs:
         with:
           name: unit-test-report
           path: reports/
-
-  codeql:
-    name: CodeQL Security Scan
-    runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
-      security-events: write # Required to upload the analysis results
-    strategy:
-      matrix: 
-        language: [ 'python']
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v5.0.0
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: ${{ matrix.language }}
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
-        with:
-          category: "security"
-
-  sonarqube:
-    name: SonarQube
-    runs-on: ubuntu-latest
-    needs: unit-tests
-    steps:
-      - uses: actions/checkout@v5.0.0
-        with:
-          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
-      - name: Download Coverage Report
-        uses: actions/download-artifact@v5.0.0
-        with:
-          name: unit-test-report
-          path: reports/
-      - name: SonarQube Scan
-        uses: SonarSource/sonarqube-scan-action@v6
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      - name: SonarQube Quality Gate Check
-        uses: SonarSource/sonarqube-quality-gate-action@v1.1.0
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   build:
     name: Build Image
